@@ -13,6 +13,7 @@ In this folder:
 - ReadME
 - Mainboard-Finder.exe from lightcr1
 - MBF 06-10-2023v2.ps1
+- MBF_25.06.2025.exe
 -----------------------------------------------------------------
 Works for:
 - HP

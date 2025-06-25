@@ -6,7 +6,6 @@
 Copyright: lightcr1
 Version: v0.2 (
 -----------------------------------------------------------------
-This folder contains Software from a 1st year System engineer.
 Some Software in here is not 100% finished. 
 All rights belong to me!
 -----------------------------------------------------------------

@@ -1,3 +1,5 @@
+using System;
+using System.Threading;
 using System.Windows;
 using ExplorerPreview.Cache;
 using ExplorerPreview.Rendering;

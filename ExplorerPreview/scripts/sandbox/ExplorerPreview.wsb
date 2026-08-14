@@ -1,0 +1,14 @@
+<Configuration>
+  <VGpu>Enable</VGpu>
+  <Networking>Enable</Networking>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>C:\SandboxShare</HostFolder>
+      <SandboxFolder>C:\SandboxShare</SandboxFolder>
+      <ReadOnly>false</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <Command>powershell -ExecutionPolicy Bypass -File C:\SandboxShare\ExplorerPreview\scripts\sandbox\setup.ps1</Command>
+  </LogonCommand>
+</Configuration>

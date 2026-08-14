@@ -1,21 +1,21 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-  Registriert ExplorerPreview.Handler als echten Windows-Shell-Preview-Handler.
+  Registers ExplorerPreview.Handler as a real Windows shell preview handler.
 
 .DESCRIPTION
-  Trägt die COM-Registrierung (CLSID, InprocServer32, AppID-Surrogat) sowie die
-  Zuordnung zu Dateiendungen in die Registry ein, und trägt den Handler in die
-  von Explorer geprüfte "genehmigte Handler"-Liste ein (ohne diesen Eintrag
-  ignoriert Explorer aus Sicherheitsgründen unbekannte Preview-Handler
-  stillschweigend - das ist einer der häufigsten Stolpersteine bei sowas).
+  Writes the COM registration (CLSID, InprocServer32, AppID surrogate) plus
+  the per-extension association into the registry, and adds the handler to
+  the "approved handlers" list Explorer checks (without this entry Explorer
+  silently ignores unknown preview handlers for security reasons - this is
+  one of the most common gotchas here).
 
 .PARAMETER Extensions
-  Dateiendungen, für die dieser Handler zuständig sein soll (mit führendem Punkt).
-  VORSICHT: Das ÜBERSCHREIBT einen ggf. schon vorhandenen Preview-Handler für
-  diese Endung systemweit (z.B. Adobe/Edge für .pdf). Zum ersten Testen daher
-  eine Endung ohne bestehenden Handler empfehlenswert (z.B. .log, .csv),
-  bevor man z.B. .pdf umbiegt.
+  File extensions this handler should be responsible for (with leading dot).
+  WARNING: this OVERWRITES any preview handler already registered for that
+  extension system-wide (e.g. Adobe/Edge for .pdf). Recommended to test with
+  an extension that has no existing handler first (e.g. .log, .csv) before
+  pointing this at .pdf.
 
 .EXAMPLE
   .\Register-PreviewHandler.ps1 -Extensions .log,.csv
@@ -39,16 +39,16 @@ if (-not $DllPath) {
     $candidates = Get-ChildItem -Path (Join-Path $repoRoot "src\ExplorerPreview.Handler\bin") `
         -Filter "ExplorerPreview.Handler.comhost.dll" -Recurse -ErrorAction SilentlyContinue
     if (-not $candidates) {
-        throw "Keine ExplorerPreview.Handler.comhost.dll gefunden. Erst 'dotnet build' im Handler-Projekt ausführen oder -DllPath explizit angeben."
+        throw "No ExplorerPreview.Handler.comhost.dll found. Run 'dotnet publish' on the Handler project first, or pass -DllPath explicitly."
     }
     $DllPath = ($candidates | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
 }
 
 if (-not (Test-Path $DllPath)) {
-    throw "DLL nicht gefunden: $DllPath"
+    throw "DLL not found: $DllPath"
 }
 
-Write-Host "Registriere Preview-Handler:" -ForegroundColor Cyan
+Write-Host "Registering preview handler:" -ForegroundColor Cyan
 Write-Host "  CLSID: $Clsid"
 Write-Host "  DLL:   $DllPath"
 
@@ -62,28 +62,28 @@ New-Item -Path $inprocKey -Force | Out-Null
 Set-ItemProperty -Path $inprocKey -Name "(Default)" -Value $DllPath
 Set-ItemProperty -Path $inprocKey -Name "ThreadingModel" -Value "Apartment"
 
-# --- AppID: erzwingt Hosting im prevhost.exe-Surrogatprozess statt in-process
-#     in Explorer selbst - das ist der von Microsoft empfohlene, robustere Weg
-#     (ein Absturz im Handler reißt dann nicht explorer.exe mit runter). ---
+# --- AppID: forces hosting in the prevhost.exe surrogate process instead of
+#     in-process inside Explorer itself - the approach Microsoft recommends
+#     (a crash in the handler then doesn't take explorer.exe down with it). ---
 Set-ItemProperty -Path $clsidKey -Name "AppID" -Value $Clsid
 $appIdKey = "HKLM:\SOFTWARE\Classes\AppID\$Clsid"
 New-Item -Path $appIdKey -Force | Out-Null
 Set-ItemProperty -Path $appIdKey -Name "DllSurrogate" -Value ""
 
-# --- In die von Explorer geprüfte Positivliste eintragen ---
+# --- Add to the approved-handlers allowlist Explorer checks ---
 $approvedKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\PreviewHandlers"
 New-Item -Path $approvedKey -Force | Out-Null
 Set-ItemProperty -Path $approvedKey -Name $Clsid -Value $HandlerName
 
-# --- Pro Dateiendung eintragen ---
+# --- Register per file extension ---
 foreach ($ext in $Extensions) {
     if (-not $ext.StartsWith(".")) { $ext = ".$ext" }
     $shellexKey = "HKLM:\SOFTWARE\Classes\$ext\shellex\$PreviewHandlerCategoryClsid"
     New-Item -Path $shellexKey -Force | Out-Null
     Set-ItemProperty -Path $shellexKey -Name "(Default)" -Value $Clsid
-    Write-Host "  Registriert für: $ext" -ForegroundColor Green
+    Write-Host "  Registered for: $ext" -ForegroundColor Green
 }
 
 Write-Host ""
-Write-Host "Fertig. Explorer neu starten, damit die Änderung sicher greift:" -ForegroundColor Yellow
+Write-Host "Done. Restart Explorer so the change reliably takes effect:" -ForegroundColor Yellow
 Write-Host "  Stop-Process -Name explorer -Force; Start-Process explorer"

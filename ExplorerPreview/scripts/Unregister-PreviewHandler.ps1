@@ -1,11 +1,11 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-  Entfernt die ExplorerPreview.Handler-Registrierung wieder vollständig
-  (Gegenstück zu Register-PreviewHandler.ps1).
+  Removes the ExplorerPreview.Handler registration entirely
+  (counterpart to Register-PreviewHandler.ps1).
 
 .PARAMETER Extensions
-  Dateiendungen, deren shellex-Zuordnung zu diesem Handler entfernt werden soll.
+  File extensions whose shellex association with this handler should be removed.
 #>
 param(
     [Parameter(Mandatory = $true)]
@@ -22,7 +22,7 @@ foreach ($ext in $Extensions) {
     $shellexKey = "HKLM:\SOFTWARE\Classes\$ext\shellex\$PreviewHandlerCategoryClsid"
     if (Test-Path $shellexKey) {
         Remove-Item -Path $shellexKey -Force
-        Write-Host "Entfernt für: $ext" -ForegroundColor Green
+        Write-Host "Removed for: $ext" -ForegroundColor Green
     }
 }
 
@@ -30,5 +30,5 @@ Remove-Item -Path "HKLM:\SOFTWARE\Classes\CLSID\$Clsid" -Recurse -Force -ErrorAc
 Remove-Item -Path "HKLM:\SOFTWARE\Classes\AppID\$Clsid" -Recurse -Force -ErrorAction SilentlyContinue
 Remove-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\PreviewHandlers" -Name $Clsid -ErrorAction SilentlyContinue
 
-Write-Host "Handler-Registrierung entfernt. Explorer neu starten:" -ForegroundColor Yellow
+Write-Host "Handler registration removed. Restart Explorer:" -ForegroundColor Yellow
 Write-Host "  Stop-Process -Name explorer -Force; Start-Process explorer"

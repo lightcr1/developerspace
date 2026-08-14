@@ -1,38 +1,43 @@
 # Explorer Preview
 
-Immer sichtbare Datei-Vorschau, die neben dem aktiven Windows-Explorer-Fenster
-mitläuft — ohne Leertaste, ohne Windows' "Diese Datei könnte Ihren Computer
-beschädigen"-Warnung, und robust gegenüber langsamen NAS-/Netzlaufwerken.
+Immer sichtbare Datei-Vorschau für Windows — ohne Leertaste, ohne Windows'
+"Diese Datei könnte Ihren Computer beschädigen"-Warnung, und robust gegenüber
+langsamen NAS-/Netzlaufwerken.
 
-> **Status:** v0.1, in diesem Repo aus einer Linux-Umgebung heraus geschrieben
-> und **nicht kompiliert/getestet**. Windows + Visual Studio / `dotnet build`
-> zum ersten Build sind nötig. Bitte Bugs/Abweichungen zurückmelden — das ist
-> ein reales Grundgerüst, kein Pseudocode, aber der erste Build-Durchlauf wird
-> vermutlich noch kleinere Anpassungen brauchen (typische Kandidaten unten).
+Das Repo enthält zwei Varianten, die sich dieselbe Rendering-Logik
+(`ExplorerPreview.Core`) teilen:
+
+1. **`ExplorerPreview`** — schwebendes Fenster, das neben dem aktiven
+   Explorer-Fenster mitläuft. Einfach zu starten (`dotnet run`), kein Setup.
+2. **`ExplorerPreview.Handler`** — ein echter Windows-`IPreviewHandler`, den
+   Explorer direkt in seine eingebaute Vorschauleiste lädt (Ansicht →
+   Vorschaufenster). Kein Extra-Fenster, aber deutlich mehr Setup (COM-
+   Registrierung) und fehleranfälliger beim ersten Einrichten.
+
+> **Status:** Variante 1 wurde erfolgreich gebaut und läuft (Stand: erste
+> Live-Tests). Variante 2 (`ExplorerPreview.Handler`) ist **komplett
+> ungetestet** — COM-Registrierung von Windows-Shell-Erweiterungen lässt sich
+> praktisch nicht ohne echtes Windows verifizieren. Rechne mit mehreren
+> Debug-Runden, siehe Abschnitt "Preview-Handler debuggen" unten.
 
 ## Was es tut
 
-- Pollt (alle 200ms) das aktive Explorer-Fenster über COM auf die aktuell
-  markierte Datei (kein Windows-Hook, keine Admin-Rechte nötig).
-- Zeigt die Vorschau in einem eigenen, neben dem Explorer-Fenster
-  angedockten Fenster (kein Leertastendruck).
 - Kopiert Dateien **immer zuerst lokal** (Cache unter
   `%LOCALAPPDATA%\ExplorerPreview\cache`) mit Timeout + einem Retry, bevor
-  gerendert wird — hängt die UI nicht ein, wenn das NAS langsam/offline ist.
-- Rendert selbst statt über Windows-`IPreviewHandler`:
+  gerendert wird — hängt nicht, wenn das NAS langsam/offline ist.
+- Rendert selbst statt sich auf Windows-eigene Preview-Handler zu verlassen:
   - Bilder, PDF, Video → direkt über WebView2 (Edge-Engine)
   - Text/Code → als HTML-Textblock
   - Office-Dokumente (docx/xlsx/pptx/...) → Konvertierung zu PDF über eine
     lokale LibreOffice-Installation (headless, isoliertes Profil, Timeout),
     danach Anzeige über WebView2
-- Weil die MOTW-Prüfung nie aufgerufen wird (wir nutzen nicht die
-  Office-eigenen Preview-Handler), erscheint die "Computer beschädigt"-
-  Warnung nicht — **siehe Sicherheitsabschnitt unten**, das ist ein bewusster
-  Trade-off, kein Bug.
+- Weil die MOTW-Prüfung der Office-eigenen Handler nie aufgerufen wird,
+  erscheint die "Computer beschädigt"-Warnung nicht — **siehe
+  Sicherheitsabschnitt unten**, bewusster Trade-off, kein Bug.
 
 ## Voraussetzungen
 
-- Windows 10/11
+- Windows 10/11 (x64)
 - [.NET 8 SDK](https://dotnet.microsoft.com/download)
 - [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
   (auf den meisten aktuellen Windows-Installationen bereits vorhanden)
@@ -42,7 +47,7 @@ beschädigen"-Warnung, und robust gegenüber langsamen NAS-/Netzlaufwerken.
   funktioniert alles andere trotzdem, Office-Dateien zeigen dann eine
   Fehlermeldung statt Absturz.
 
-## Bauen & Starten
+## Variante 1: Schwebendes Fenster
 
 ```powershell
 cd ExplorerPreview
@@ -50,37 +55,85 @@ dotnet build .\ExplorerPreview.sln
 dotnet run --project .\src\ExplorerPreview\ExplorerPreview.csproj
 ```
 
-Die App läuft als Tray-Icon (rechtsklick → Beenden). Ein Explorer-Fenster
-öffnen, eine einzelne Datei markieren → Vorschau erscheint rechts daneben.
+Läuft als Tray-Icon (Rechtsklick → Beenden). Explorer-Fenster öffnen, eine
+einzelne Datei markieren → Vorschau erscheint rechts daneben.
 
-## Bekannte Grenzen / erwartete erste Baustellen
+**Bekannte Einschränkungen:**
+- Kein Multi-Monitor-Clamping (Fenster kann am Bildschirmrand überstehen).
+- Folgt immer dem Explorer-Fenster im Vordergrund, nicht mehreren gleichzeitig.
+- Video spielt die Originaldatei per `<video>`-Tag statt Thumbnail — bei
+  großen Dateien über NAS wartet man auf die volle lokale Kopie.
 
-- **COM-Interop-Namen (`SHDocVw`, `Shell32`)**: Die `<COMReference>`-Einträge
-  im `.csproj` binden die Windows-eigenen Typebibliotheken zur Build-Zeit ein.
-  Falls `dotnet build` hier meckert, sind ggf. leicht andere Registrierungen
-  auf dem Zielsystem nötig — Details siehe Kommentare in `SelectionWatcher.cs`.
-  Der Code nutzt bewusst `dynamic` statt starker Typisierung, um Versions-
-  unterschiede der generierten Interop-Typen abzufedern.
-- **Docking-Logik** (`PreviewWindow.DockBeside`) ist ein einfacher
-  `SetWindowPos` rechts vom Explorer-Fenster — kein echtes Einbetten *in*
-  `explorer.exe` (siehe Sicherheits-/Architekturdiskussion: das wäre DLL-
-  Injection in einen Microsoft-Prozess, instabil und nicht unterstützt).
-  Bei mehreren offenen Explorer-Fenstern folgt die Vorschau immer dem
-  Fenster im Vordergrund.
-- **Kein echtes Multi-Monitor-Clamping**: Wenn das Explorer-Fenster ganz
-  rechts am Bildschirmrand steht, kann das Vorschaufenster über den
-  sichtbaren Bereich hinausragen. Einfacher Folge-Fix: Bildschirmgrenzen in
-  `DockBeside` berücksichtigen.
-- **Video-Vorschau** spielt die Originaldatei per `<video>`-Tag ab statt ein
-  Thumbnail zu erzeugen — einfacher und robuster, aber bei sehr großen
-  Videos über NAS wartet man auf die volle lokale Kopie, bevor die Wiedergabe
-  startet.
+## Variante 2: Echter Preview-Handler (in Explorer eingebettet)
+
+### Bauen
+
+```powershell
+cd ExplorerPreview
+dotnet publish .\src\ExplorerPreview.Handler\ExplorerPreview.Handler.csproj -c Release -r win-x64
+```
+
+Das erzeugt u. a. `ExplorerPreview.Handler.comhost.dll` unter
+`src\ExplorerPreview.Handler\bin\Release\net8.0-windows10.0.19041.0\win-x64\publish\`.
+Diese Datei ist die eigentliche COM-Server-DLL.
+
+### Registrieren
+
+**PowerShell als Administrator:**
+
+```powershell
+cd ExplorerPreview\scripts
+.\Register-PreviewHandler.ps1 -Extensions .log,.csv
+```
+
+Bewusst mit einer unkritischen Testendung anfangen (`.log`, `.csv` haben
+i. d. R. noch keinen registrierten Preview-Handler) — nicht direkt `.pdf`,
+denn das **überschreibt systemweit** den bestehenden Handler (Adobe/Edge)
+für diese Endung. Erst wenn das Grundprinzip nachweislich funktioniert,
+gezielt auf `.pdf`/`.docx`/etc. ausweiten.
+
+```powershell
+Stop-Process -Name explorer -Force; Start-Process explorer
+```
+
+Danach: Explorer öffnen, Ansicht → Vorschaufenster aktivieren, eine `.log`-
+oder `.csv`-Datei markieren.
+
+### Deregistrieren
+
+```powershell
+.\Unregister-PreviewHandler.ps1 -Extensions .log,.csv
+```
+
+### Preview-Handler debuggen
+
+Das ist der unangenehme Teil — es gibt kaum hilfreiche Fehlermeldungen,
+wenn etwas nicht klappt:
+
+- **Gar nichts passiert / leeres Vorschaufeld:** Meist fehlt der Eintrag in
+  der "genehmigten Handler"-Liste (`HKLM:\SOFTWARE\Microsoft\Windows\
+  CurrentVersion\PreviewHandlers`) — das Skript trägt den zwar ein, aber
+  prüfen lohnt sich (`Get-ItemProperty` auf den Key).
+- **Explorer stürzt ab / hängt:** Da der Handler über `AppID`/`DllSurrogate`
+  im separaten `prevhost.exe`-Prozess läuft, sollte ein Fehler im Handler
+  *nicht* Explorer selbst mitreißen — im Task-Manager nach `prevhost.exe`
+  suchen, ob der hängt/abstürzt, statt `explorer.exe` zu beschuldigen.
+- **`dotnet publish` findet `EnableComHosting` nicht / keine `.comhost.dll`
+  erzeugt:** Sicherstellen, dass `-r win-x64` mit angegeben wird (Self-
+  Contained + RuntimeIdentifier sind für COM-Hosting in diesem Setup nötig).
+- **Falsche Bitness:** `prevhost.exe` existiert in 32- und 64-Bit-Varianten
+  (`SysWOW64` vs. `System32`). Diese Registrierung ist konsequent auf x64
+  ausgelegt (`Platforms x64`, `win-x64`) — auf einem x64-Windows sollte das
+  automatisch die richtige Variante treffen.
+- **Process Monitor** (Sysinternals) ist das mit Abstand nützlichste Tool
+  hier: Filter auf `prevhost.exe`, zeigt genau, welche Registry-Keys gesucht
+  und ob die DLL überhaupt geladen wird.
 
 ## Sicherheit: MOTW-Warnung & Office-Dateien
 
 Die native Windows-Warnung ("Diese Datei könnte Ihren Computer beschädigen")
 kommt vom Mark-of-the-Web-Mechanismus (`Zone.Identifier`) und wird von den
-*Windows-eigenen* Preview-Handlern (v.a. Office) aktiv geprüft, um Exploits
+*Windows-eigenen* Preview-Handlern (v. a. Office) aktiv geprüft, um Exploits
 in deren Parsern bei Dateien aus dem Internet/Netzwerk zu verhindern.
 
 Dieses Tool ruft diese Handler nicht auf und sieht die Warnung deshalb nie —
@@ -101,13 +154,23 @@ das ist gewollt, aber kein Freifahrtschein:
 ## Projektstruktur
 
 ```
-src/ExplorerPreview/
-  App.xaml(.cs)              Einstiegspunkt, Tray-Icon, Verdrahtung
-  PreviewWindow.xaml(.cs)     Schwebendes Vorschaufenster (WebView2-Host)
-  AppSettings.cs              Zentrale Konfiguration
-  Shell/SelectionWatcher.cs   Explorer-Auswahl per COM-Polling
-  Cache/PreviewCache.cs       NAS-sicherer lokaler Kopie-Cache (Timeout/Retry)
-  Rendering/RendererSelector.cs   Entscheidet Renderer nach Dateityp
-  Rendering/OfficeConverter.cs    LibreOffice-headless-Konvertierung
-  Native/NativeMethods.cs     Win32 P/Invoke (Fenstererkennung/-positionierung)
+src/ExplorerPreview.Core/        Geteilte Logik (von beiden Varianten genutzt)
+  AppSettings.cs                 Zentrale Konfiguration
+  Cache/PreviewCache.cs          NAS-sicherer lokaler Kopie-Cache (Timeout/Retry)
+  Rendering/RendererSelector.cs  Entscheidet Renderer nach Dateityp
+  Rendering/OfficeConverter.cs   LibreOffice-headless-Konvertierung
+  Native/NativeMethods.cs        Win32 P/Invoke
+
+src/ExplorerPreview/             Variante 1: schwebendes Fenster
+  App.xaml(.cs)                  Einstiegspunkt, Tray-Icon, Verdrahtung
+  PreviewWindow.xaml(.cs)        Fenster (WebView2-Host)
+  Shell/SelectionWatcher.cs      Explorer-Auswahl per COM-Polling
+
+src/ExplorerPreview.Handler/     Variante 2: echter IPreviewHandler
+  Interop.cs                     COM-Interface-Deklarationen (IPreviewHandler etc.)
+  ExplorerPreviewHandler.cs      Die eigentliche Handler-Implementierung
+
+scripts/
+  Register-PreviewHandler.ps1    COM-/Registry-Registrierung (Admin nötig)
+  Unregister-PreviewHandler.ps1  Gegenstück
 ```

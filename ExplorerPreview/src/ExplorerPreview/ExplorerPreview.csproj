@@ -16,6 +16,10 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2739.15" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ExplorerPreview.Core\ExplorerPreview.Core.csproj" />
+  </ItemGroup>
+
   <!--
     Bewusst KEINE <COMReference>-Einträge für SHDocVw/Shell32: die generierte
     ResolveComReference-Aufgabe wird von der .NET-Core-MSBuild-Version (die

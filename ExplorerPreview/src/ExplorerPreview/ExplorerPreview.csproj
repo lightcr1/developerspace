@@ -17,32 +17,12 @@
   </ItemGroup>
 
   <!--
-    Diese beiden COM-Referenzen binden die Windows-eigenen Typebibliotheken
-    "Microsoft Internet Controls" (SHDocVw) und "Microsoft Shell Controls And
-    Automation" (Shell32) ein. Sie werden beim Build automatisch aus der
-    lokal registrierten Windows-Installation erzeugt (tlbimp) - dafür muss
-    das Projekt auf einem echten Windows-Rechner gebaut werden, nicht in CI
-    unter Linux/Mac.
+    Bewusst KEINE <COMReference>-Einträge für SHDocVw/Shell32: die generierte
+    ResolveComReference-Aufgabe wird von der .NET-Core-MSBuild-Version (die
+    "dotnet build" nutzt) nicht unterstützt (MSB4803) - nur von der vollen
+    .NET-Framework-MSBuild aus Visual Studio. SelectionWatcher.cs umgeht das
+    komplett, indem es die Shell-COM-Objekte per ProgID + dynamic (Late-Binding)
+    anspricht, ganz ohne generierte Interop-Assembly.
   -->
-  <ItemGroup>
-    <COMReference Include="SHDocVw">
-      <Guid>{EAB22AC0-30C1-11CF-A7EB-0000C05BAE0B}</Guid>
-      <VersionMajor>1</VersionMajor>
-      <VersionMinor>1</VersionMinor>
-      <Lcid>0</Lcid>
-      <WrapperTool>tlbimp</WrapperTool>
-      <Isolated>false</Isolated>
-      <EmbedInteropTypes>true</EmbedInteropTypes>
-    </COMReference>
-    <COMReference Include="Shell32">
-      <Guid>{50A7E9B0-70EF-11D1-B75A-00A0C90564FE}</Guid>
-      <VersionMajor>1</VersionMajor>
-      <VersionMinor>0</VersionMinor>
-      <Lcid>0</Lcid>
-      <WrapperTool>tlbimp</WrapperTool>
-      <Isolated>false</Isolated>
-      <EmbedInteropTypes>true</EmbedInteropTypes>
-    </COMReference>
-  </ItemGroup>
 
 </Project>

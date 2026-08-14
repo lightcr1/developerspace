@@ -26,7 +26,7 @@ public static class AppSettings
     /// Kann auf false gesetzt werden, wenn man Office-Dateien aus Vorsicht grundsätzlich
     /// nicht automatisch konvertieren/anzeigen lassen will.
     /// </summary>
-    public const bool EnableOfficePreview = true;
+    public static readonly bool EnableOfficePreview = true;
 
     /// <summary>Pfad zu soffice.exe. Übliche Standardinstallation unter Windows.</summary>
     public const string LibreOfficePath = @"C:\Program Files\LibreOffice\program\soffice.exe";

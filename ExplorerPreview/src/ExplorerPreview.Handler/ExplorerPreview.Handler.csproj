@@ -14,7 +14,6 @@
       Dokumentiert unter https://learn.microsoft.com/dotnet/core/native-interop/expose-components-to-com
     -->
     <EnableComHosting>true</EnableComHosting>
-    <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   </PropertyGroup>
 
